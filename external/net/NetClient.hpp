@@ -2,6 +2,7 @@
 
 #include "NetCommon.hpp"
 #include "NetThreadsafeQueue.hpp"
+#include "NetMessage.hpp"
 #include "NetConnection.hpp"
 
 namespace net
@@ -11,7 +12,7 @@ template<typename T>
 class ClientInterface
 {
 public:
-    ClientInterface() : m_socket(m_context) {}
+    ClientInterface() {}
 
     virtual ~ClientInterface()
     {
@@ -24,10 +25,10 @@ public:
         {
             boost::asio::ip::tcp::resolver resolver(m_context);
             boost::asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
-
-            m_connection = std::make_unique<Connection<T>>(Connection<T>::Owner::client, m_context, asio::ip::tcp::socket(m_context), m_qMessagesIn);
             
-            m_connection->ConnectToServer(endpoints);
+            m_connection = std::make_unique<Connection<T>>(Connection<T>::Owner::client, m_context, boost::asio::ip::tcp::socket(m_context), m_qMessagesIn);
+            
+            m_connection->connectToServer(endpoints);
 
             thrContext = std::thread([this]() { m_context.run(); });
         }
@@ -38,6 +39,14 @@ public:
         }
 
         return true;
+    }
+
+    void send(const Message<T>& msg)
+    {
+        if (isConnected())
+            m_connection->send(msg);
+        else
+            std::cout << "Client is not connected to server" << std::endl;
     }
 
     void disconnect()
@@ -69,7 +78,6 @@ public:
 protected:
     boost::asio::io_context m_context;
     std::thread thrContext;
-    boost::asio::ip::tcp::socket m_socket;
     std::unique_ptr<Connection<T>> m_connection;
     
 private:

@@ -4,7 +4,13 @@
 
 int main()
 {
-    system("pause");
+    TicTacToeServer server(60000); 
+	server.start();
+
+    while (true)
+	{
+		server.update(-1, true);
+	}
 
     return 0;
 }

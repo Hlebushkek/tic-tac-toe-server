@@ -1,9 +1,9 @@
 #pragma once
 
 #include "NetCommon.hpp"
+#include "NetThreadsafeQueue.hpp"
 #include "NetMessage.hpp"
 #include "NetConnection.hpp"
-#include "NetThreadsafeQueue.hpp"
 
 namespace net
 {
@@ -63,7 +63,7 @@ public:
                     std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << "\n";
 
                     std::shared_ptr<Connection<T>> newconn =
-                        std::make_shared<Connection<T>>(Connection<T>::owner::server,
+                        std::make_shared<Connection<T>>(Connection<T>::Owner::server,
                             m_asioContext, std::move(socket), m_qMessagesIn);
 
                     if (onClientConnect(newconn))

@@ -45,12 +45,18 @@ public:
     {
         std::scoped_lock lock(muxQueue);
         deqQueue.emplace_back(std::move(item));
+
+        std::unique_lock<std::mutex> ul(muxBlocking);
+        cvBlocking.notify_one();
     }
 
     void push_front(const T& item)
     {
         std::scoped_lock lock(muxQueue);
         deqQueue.emplace_front(std::move(item));
+
+        std::unique_lock<std::mutex> ul(muxBlocking);
+        cvBlocking.notify_one();
     }
 
     bool empty()
@@ -71,9 +77,20 @@ public:
         deqQueue.clear();
     }
 
+    void wait()
+    {
+        while (empty())
+        {
+            std::unique_lock<std::mutex> ul(muxBlocking);
+            cvBlocking.wait(ul);
+        }
+    }
+
 private:
     std::mutex muxQueue;
     std::deque<T> deqQueue;
+    std::condition_variable cvBlocking;
+    std::mutex muxBlocking;
 
 };
 

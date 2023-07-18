@@ -33,7 +33,12 @@ public:
             {
                 if (!ec)
                 {
+                    std::cout << "Connected to server, read header" << std::endl;
                     readHeader();
+                }
+                else
+                {
+                    std::cout << ec.message() << std::endl;
                 }
             });
         }
@@ -46,6 +51,7 @@ public:
             if (m_socket.is_open())
             {
                 id = uid;
+                std::cout << "Connected to client, read header" << std::endl;
                 readHeader();
             }
         }
@@ -62,19 +68,18 @@ public:
         return m_socket.is_open();
     }
 
-    void send(const Message<T>& message)
+    void send(const Message<T>& msg)
     {
         boost::asio::post(m_asioContext,
-            [this, message]()
+            [this, msg]()
+        {
+            bool bWritingMessage = !m_qMessagesOut.empty();
+            m_qMessagesOut.push_back(msg);
+            if (!bWritingMessage)
             {
-                bool bWritingMessage = !m_qMessagesOut.empty();
-                m_qMessagesOut.push_back(message);
-                if (!bWritingMessage)
-                {
-                    writeHeader();
-                }
+                writeHeader();
             }
-        );
+        });
     }
 
     uint32_t getID() const
@@ -87,40 +92,45 @@ private:
     {
         boost::asio::async_read(m_socket, boost::asio::buffer(&m_msgTemporaryIn.header, sizeof(MessageHeader<T>)),
             [this](std::error_code ec, std::size_t length)
+        {
+            std::cout << "sizeof " << sizeof(MessageHeader<T>) << std::endl;    
+            if (!ec)
             {
-                if (!ec)
+                if (m_msgTemporaryIn.header.size > 0)
                 {
-                    if (this->m_msgTemporaryIn.header.size > 0)
-                    {
-                        this->m_msgTemporaryIn.body.resize(this->m_msgTemporaryIn.header.size);
-                        readBody();
-                    }
-                    else
-                    {
-                        addToIncomingMessageQueue();
-                    }
+                    m_msgTemporaryIn.body.resize(m_msgTemporaryIn.header.size);
+                    std::cout << "readHeader readBody" << std::endl;
+                    std::cout << "size: " << this->m_msgTemporaryIn.header.size << std::endl;
+                    readBody();
                 }
                 else
                 {
-                    std::cout << "[" << id << "] Read Header Fail.\n";
-                    m_socket.close();
+                    std::cout << "readHeader else" << std::endl;
+                    addToIncomingMessageQueue();
                 }
             }
-        );
+            else
+            {
+                std::cout << "[" << id << "] Read Header Fail.\n";
+                m_socket.close();
+            }
+        });
     }
 
     void readBody()
     {
         boost::asio::async_read(m_socket, boost::asio::buffer(m_msgTemporaryIn.body.data(), m_msgTemporaryIn.body.size()),
-			[this](std::error_code ec, std::size_t length)
-        {						
+            [this](std::error_code ec, std::size_t length)
+        {
             if (!ec)
             {
+                std::cout << "readBody addToIncomingMessageQueue" << std::endl;
                 addToIncomingMessageQueue();
             }
             else
             {
                 std::cout << "[" << id << "] Read Body Fail.\n";
+                std::cout << ec.message() << std::endl;
                 m_socket.close();
             }
         });
@@ -190,7 +200,7 @@ private:
 protected:
     boost::asio::ip::tcp::socket m_socket;
 
-    boost::asio::io_context m_asioContext;
+    boost::asio::io_context& m_asioContext;
 
     TSQueue<Message<T>> m_qMessagesOut;
     TSQueue<OwnedMessage<T>>& m_qMessagesIn;
@@ -198,7 +208,7 @@ protected:
 
     Owner m_nOwnerType = Owner::server;
 
-    uint32_t id;
+    uint32_t id = 0;
 };
 
 }
